@@ -1,0 +1,16 @@
+[package]
+name = "md2nb"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pulldown-cmark = "0.9.1"
+
+wolfram-app-discovery = "0.1.2"
+wolfram-expr = "0.1.0"
+# wstp = "0.1.3"
+wstp = { path = "../../WolframResearch/wstp-rs" }
+
+clap = { version = "3.0.14", features = ["derive"] }
