@@ -33,6 +33,14 @@ fn main() -> Result<(), kernel::Error> {
 
     let ast = ast::parse_markdown_to_ast(&contents);
 
+    /* For debugging.
+    println!("\n\n===== AST =====\n");
+    for block in &ast {
+        println!("block: {block:?}\n");
+    }
+    println!("\n\n===== End AST =====\n");
+    */
+
     //----------------------------------------------------------------
     // Determine the output file location
     //----------------------------------------------------------------
