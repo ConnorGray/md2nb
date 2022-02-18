@@ -15,17 +15,47 @@ use crate::kernel::KernelProcess;
 /// Discovery local installations of the Wolfram Language and Wolfram products.
 #[derive(Parser, Debug)]
 struct Args {
+    /// Markdown input file.
     input: PathBuf,
-    output: PathBuf,
+
+    /// Output file location. (default: <INPUT>.nb)
+    ///
+    /// If this is a directory, the output notebook file will have the same file name
+    /// as the input file.
+    output: Option<PathBuf>,
 }
 
 fn main() -> Result<(), kernel::Error> {
     let Args { input, output } = Args::parse();
 
     let contents: String =
-        std::fs::read_to_string(input).expect("failed to read input file");
+        std::fs::read_to_string(&input).expect("failed to read input file");
 
     let ast = ast::parse_markdown_to_ast(&contents);
+
+    //----------------------------------------------------------------
+    // Determine the output file location
+    //----------------------------------------------------------------
+
+    // If `output` is a directory, automatically determine the file name from `input`.
+    // E.g. `$ md2nb README.md` will automatically write to `./README.nb`.
+    let auto_file_name = format!("{}.nb", input.file_stem().unwrap().to_str().unwrap());
+
+    let output = match output {
+        Some(output) if output.is_dir() => output.join(auto_file_name),
+        Some(output) => output,
+        None => std::env::current_dir().unwrap().join(auto_file_name),
+    };
+
+    // TODO: This has a TOCTOU race. `output` may not exist now, but another program
+    //       could create it before we do. Considering the startup time of the Kernel
+    //       and the time it takes to generate larger files, that span will often be
+    //       several seconds at least.
+    // TODO: Support an `--overwrite` or `-f, --force` option to disable this.
+    //       NotebookSave will overwrite by default.
+    if output.exists() {
+        panic!("error: output file already exists: {}", output.display())
+    }
 
     //----------------------------------------------------------------
     // Convert the Markdown AST to a sequence of Cell[..] expressions.
