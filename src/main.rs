@@ -31,7 +31,7 @@ fn main() -> Result<(), kernel::Error> {
     // Convert the Markdown AST to a sequence of Cell[..] expressions.
     //----------------------------------------------------------------
 
-    let cells: Vec<Expr> = ast.into_iter().flat_map(nb::node_to_cells).collect();
+    let cells: Vec<Expr> = ast.into_iter().flat_map(nb::block_to_cells).collect();
 
     //----------------------------------------------------------
     // Launch the Kernel, and write the cells to a new notebook.

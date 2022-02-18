@@ -14,3 +14,7 @@ wolfram-expr = "0.1.0"
 wstp = { path = "../../WolframResearch/wstp-rs" }
 
 clap = { version = "3.0.14", features = ["derive"] }
+
+[dev-dependencies]
+indoc = "1.0.3"
+pretty_assertions = "1.1.0"

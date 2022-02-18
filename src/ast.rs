@@ -1,42 +1,18 @@
 //! Parse a Markdown input string into a sequence of Markdown abstract syntax tree
-//! [`Node`]s.
+//! [`Block`]s.
 //!
 //! This module compensates for the fact that the `pulldown-cmark` crate is focused on
 //! efficient incremental output (pull parsing), and consequently doesn't provide it's own
 //! AST types.
 
-use std::collections::HashSet;
+mod unflatten;
 
-use pulldown_cmark::{self as md, Event, HeadingLevel, Tag};
 
-pub(crate) fn parse_markdown_to_ast(input: &str) -> Vec<Node> {
-    // Set up options and parser. Strikethroughs are not part of the CommonMark standard
-    // and we therefore must enable it explicitly.
-    let mut options = md::Options::empty();
-    options.insert(md::Options::ENABLE_STRIKETHROUGH);
-    let mut parser = md::Parser::new_ext(input, options);
+use std::{collections::HashSet, mem};
 
-    let mut builder = AstBuilder::default();
+use pulldown_cmark::{self as md, Event, HeadingLevel, LinkType, Tag};
 
-    loop {
-        let event = match parser.next() {
-            Some(event) => event,
-            None => break,
-        };
-
-        // println!("event: {:?}", event);
-
-        match event {
-            Event::Start(tag) => builder.start_tag(tag),
-            Event::End(tag) => builder.end_tag(tag),
-            Event::Text(text) => builder.add_inline_text(text.to_string()),
-            Event::Html(_) => println!("warning: skipping inline HTML"),
-            _ => todo!("handle: {event:?}"),
-        }
-    }
-
-    builder.complete
-}
+use self::unflatten::UnflattenedEvent;
 
 //======================================
 // AST Representation
@@ -44,22 +20,24 @@ pub(crate) fn parse_markdown_to_ast(input: &str) -> Vec<Node> {
 
 /// A piece of structural Markdown content.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Node {
-    Paragraph(Vec<TextNode>),
+pub enum Block {
+    Paragraph(Vec<TextSpan>),
     List(Vec<ListItem>),
-    Heading(HeadingLevel, Vec<TextNode>),
-    CodeBlock(Option<String>, Option<String>),
+    Heading(HeadingLevel, Vec<TextSpan>),
+    CodeBlock(Option<String>, String),
+    Rule,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ListItem(pub Vec<Node>);
+pub struct ListItem(pub Vec<Block>);
 
 /// A piece of textual Markdown content.
 #[derive(Debug, Clone, PartialEq)]
-pub enum TextNode {
+pub enum TextSpan {
     Text(String, HashSet<TextStyle>),
+    Code(String),
     Link {
-        label: Vec<TextNode>,
+        label: Vec<TextSpan>,
         destination: String,
     },
     SoftBreak,
@@ -77,215 +55,264 @@ pub enum TextStyle {
 // AST Builder
 //======================================
 
-#[derive(Default)]
-struct AstBuilder {
-    complete: Vec<Node>,
+pub(crate) fn parse_markdown_to_ast(input: &str) -> Vec<Block> {
+    /* For Markdown parsing debugging.
+    {
+        let mut options = md::Options::empty();
+        options.insert(md::Options::ENABLE_STRIKETHROUGH);
+        let parser = md::Parser::new_ext(input, options);
 
-    /// This will typically be very shallow.
-    current: Vec<Node>,
-    active_styles: HashSet<TextStyle>,
+        let events: Vec<_> = parser.into_iter().collect();
+
+        println!("==== All events =====\n");
+        for event in &events {
+            println!("{event:?}");
+        }
+        println!("\n=====================\n");
+
+        println!("==== Unflattened events =====\n");
+        for event in unflatten::parse_markdown_to_unflattened_events(input) {
+            println!("{event:#?}")
+        }
+        println!("=============================\n");
+    }
+    */
+
+    let events = unflatten::parse_markdown_to_unflattened_events(input);
+
+    events_to_blocks(events)
 }
 
-impl AstBuilder {
-    fn add_inline_text(&mut self, text: String) {
-        let text_node = TextNode::Text(text.clone(), self.active_styles.clone());
+/// Returns `true` if `event` contains content that can be added "inline" with text
+/// content.
+///
+/// `event`'s that cannot be added inline will start a new [`Block`].
+fn is_inline(event: &UnflattenedEvent) -> bool {
+    match event {
+        UnflattenedEvent::Event(event) => match event {
+            Event::Start(_) | Event::End(_) => unreachable!(),
+            Event::Text(_) => true,
+            Event::Code(_) => true,
+            Event::SoftBreak => true,
+            Event::HardBreak => true,
+            // TODO: HTML could cause break to next block?
+            Event::Html(_) => false,
+            Event::Rule => true,
+            Event::TaskListMarker(_) => false,
+            Event::FootnoteReference(_) => true,
+        },
+        UnflattenedEvent::Nested { tag, events: _ } => match tag {
+            Tag::Emphasis | Tag::Strong | Tag::Strikethrough => true,
+            Tag::Heading(_, _, _) => false,
+            Tag::Paragraph => false,
+            Tag::List(_) => false,
+            Tag::Item => false,
+            Tag::CodeBlock(_) => false,
+            _ => todo!("handle tag: {tag:?}"),
+        },
+    }
+}
 
-        match self.current.last_mut() {
-            Some(Node::Paragraph(text_nodes)) => text_nodes.push(text_node),
-            // FIXME: Handle:
-            // * hello
-            //
-            //   this is more indented item text.
-            Some(Node::List(items)) => {
-                let ListItem(nodes) = items.last_mut().unwrap();
+fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
+    let mut complete: Vec<Block> = vec![];
 
-                match nodes.last_mut() {
-                    None => nodes.push(Node::Paragraph(vec![text_node])),
-                    Some(Node::Paragraph(text_nodes)) => {
-                        text_nodes.push(text_node);
+    let mut text_spans: Vec<TextSpan> = vec![];
+
+    for event in events {
+        // println!("event: {:?}", event);
+
+        if !is_inline(&event) {
+            if !text_spans.is_empty() {
+                complete.push(Block::Paragraph(mem::replace(&mut text_spans, vec![])));
+            }
+        }
+
+        match event {
+            UnflattenedEvent::Event(event) => match event {
+                Event::Start(_) | Event::End(_) => {
+                    panic!("illegal Event::{{Start, End}} in UnflattenedEvent::Event")
+                },
+                Event::Text(text) => {
+                    text_spans.push(TextSpan::Text(text.to_string(), HashSet::new()))
+                },
+                Event::Code(code) => text_spans.push(TextSpan::Code(code.to_string())),
+                Event::SoftBreak => text_spans.push(TextSpan::SoftBreak),
+                Event::HardBreak => text_spans.push(TextSpan::HardBreak),
+                Event::Html(_) => eprintln!("warning: skipping inline HTML"),
+                Event::Rule => complete.push(Block::Rule),
+                Event::TaskListMarker(_) | Event::FootnoteReference(_) => {
+                    todo!("handle: {event:?}")
+                },
+            },
+            UnflattenedEvent::Nested { tag, events } => {
+                match tag {
+                    //
+                    // Inline content
+                    //
+                    Tag::Emphasis => {
+                        text_spans.extend(unwrap_text(
+                            events,
+                            HashSet::from_iter([TextStyle::Emphasis]),
+                        ));
                     },
-                    _ => todo!(),
+                    Tag::Strong => {
+                        text_spans.extend(unwrap_text(
+                            events,
+                            HashSet::from_iter([TextStyle::Strong]),
+                        ));
+                    },
+                    Tag::Strikethrough => {
+                        text_spans.extend(unwrap_text(
+                            events,
+                            HashSet::from_iter([TextStyle::Strikethrough]),
+                        ));
+                    },
+
+                    Tag::Link(link_type, destination, label) => {
+                        let text = unwrap_text(events, HashSet::new());
+
+                        if !label.is_empty() {
+                            eprintln!("warning: link label is ignored: {label:?}");
+                        }
+
+                        match link_type {
+                            LinkType::Inline => (),
+                            _ => todo!("support non-inline link type: {link_type:?} (destination: {destination})"),
+                        }
+
+                        text_spans.push(TextSpan::Link {
+                            label: text,
+                            destination: destination.to_string(),
+                        })
+                    },
+
+                    //
+                    // Block content
+                    //
+
+                    // TODO: Use the two Heading fields that are ignored here?
+                    Tag::Heading(level, _, _) => {
+                        complete.push(Block::Heading(
+                            level,
+                            unwrap_text(events, Default::default()),
+                        ));
+                    },
+                    Tag::Paragraph => {
+                        text_spans.extend(unwrap_text(events, Default::default()))
+                    },
+                    Tag::List(_) => {
+                        let mut items: Vec<ListItem> = Vec::new();
+
+                        for event in events {
+                            if let UnflattenedEvent::Nested {
+                                tag: Tag::Item,
+                                events: item_events,
+                            } = event
+                            {
+                                let item_blocks = events_to_blocks(item_events);
+                                items.push(ListItem(item_blocks));
+                            } else {
+                                todo!("handle list element: {event:?}");
+                            }
+                        }
+
+                        complete.push(Block::List(items));
+                    },
+                    Tag::Item => {
+                        complete.extend(events_to_blocks(events));
+                    },
+                    Tag::CodeBlock(kind) => {
+                        let fence_label = match kind {
+                            md::CodeBlockKind::Indented => None,
+                            md::CodeBlockKind::Fenced(label) => Some(label.to_string()),
+                        };
+
+                        let text_spans = unwrap_text(events, Default::default());
+
+                        let mut code_text = String::new();
+
+                        for span in text_spans {
+                            match span {
+                                TextSpan::Text(text, styles) => {
+                                    assert!(styles.is_empty());
+                                    code_text.push_str(&text);
+                                },
+                                _ => todo!("handle span: {span:?}"),
+                            }
+                        }
+
+                        complete.push(Block::CodeBlock(fence_label, code_text))
+                    },
+                    _ => todo!("handle: {tag:?}"),
                 }
             },
-            Some(Node::Heading(_, text_nodes)) => text_nodes.push(text_node),
-            Some(Node::CodeBlock(_, code_text)) => {
-                assert!(code_text.is_none());
-                *code_text = Some(text);
-            },
-            None => todo!(),
         }
     }
 
-    fn start_tag(&mut self, tag: Tag) {
-        match tag {
-            Tag::Paragraph => self.start_paragraph(),
-            // TODO: handle these other heading elements?
-            Tag::Heading(level, _, _) => self.start_heading(level),
-            Tag::Emphasis => {
-                self.active_styles.insert(TextStyle::Emphasis);
-            },
-            Tag::Strong => {
-                self.active_styles.insert(TextStyle::Strong);
-            },
-            Tag::Strikethrough => {
-                self.active_styles.insert(TextStyle::Strikethrough);
-            },
-            // TODO: Handle numbered lists.
-            Tag::List(_) => self.start_list(),
-            Tag::Item => match self.current.last_mut().unwrap() {
-                Node::List(items) => items.push(ListItem(vec![])),
-                node @ Node::Paragraph(_)
-                | node @ Node::Heading(_, _)
-                | node @ Node::CodeBlock(_, _) => {
-                    panic!("unexpected list item in {node:?}")
-                },
-            },
-            Tag::CodeBlock(kind) => {
-                let fence_label = match kind {
-                    md::CodeBlockKind::Indented => None,
-                    md::CodeBlockKind::Fenced(label) => Some(label.to_string()),
-                };
-                self.current.push(Node::CodeBlock(fence_label, None))
-            },
-            _ => todo!("handle: {tag:?}"),
-        }
+    if !text_spans.is_empty() {
+        complete.push(Block::Paragraph(text_spans));
     }
 
-    fn end_tag(&mut self, tag: Tag) {
-        match tag {
-            Tag::Paragraph => self.end_paragraph(),
-            // TODO: handle these other heading elements?
-            Tag::Heading(_, _, _) => self.end_heading(),
-            Tag::Emphasis => {
-                assert!(self.active_styles.remove(&TextStyle::Emphasis));
-            },
-            Tag::Strong => {
-                assert!(self.active_styles.remove(&TextStyle::Strong));
-            },
-            Tag::Strikethrough => {
-                assert!(self.active_styles.remove(&TextStyle::Strikethrough))
-            },
-            // TODO: Handle numbered lists.
-            Tag::List(_) => self.end_list(),
-            Tag::Item => {
-                assert!(matches!(self.current.last(), Some(Node::List(_))));
-            },
-            Tag::CodeBlock(_) => self.end_code_block(),
-            _ => todo!("handle: {tag:?}"),
-        }
-    }
-
-    // Structural
-
-    fn start_paragraph(&mut self) {
-        start_paragraph(&mut self.current)
-    }
-
-    fn end_paragraph(&mut self) {
-        let paragraph = match self.current.pop().unwrap() {
-            node @ Node::Paragraph(_) => node,
-            Node::List(_) | Node::Heading(_, _) | Node::CodeBlock(_, _) => {
-                panic!("expected Node::Paragraph at end of paragraph")
-            },
-        };
-
-        match self.current.last_mut() {
-            None => self.complete.push(paragraph),
-            _ => todo!(),
-        }
-    }
-
-    fn start_list(&mut self) {
-        match self.current.last_mut() {
-            None => self.current.push(Node::List(vec![])),
-            _ => todo!("start sub-list"),
-        }
-    }
-
-    fn end_list(&mut self) {
-        let items: Vec<ListItem> = match self.current.pop().unwrap() {
-            Node::List(items) => items,
-            Node::Paragraph(_) | Node::Heading(_, _) | Node::CodeBlock(_, _) => {
-                panic!("expected Node::List at end of list")
-            },
-        };
-
-        match self.current.last_mut() {
-            None => self.complete.push(Node::List(items)),
-            _ => todo!("end sub-list"),
-        }
-    }
-
-    fn start_heading(&mut self, level: HeadingLevel) {
-        match self.current.last_mut() {
-            Some(Node::Paragraph(_)) => self.current.push(Node::Heading(level, vec![])),
-            // FIXME: Fix and add test for this.
-            Some(Node::List(_)) => unimplemented!("heading nested instead list"),
-            Some(Node::Heading(_, _)) => panic!("heading nested inside heading"),
-            Some(Node::CodeBlock(_, _)) => panic!("heading nested inside code block"),
-            None => self.current.push(Node::Heading(level, vec![])),
-        }
-    }
-
-    fn end_heading(&mut self) {
-        let heading = match self.current.pop().unwrap() {
-            node @ Node::Heading(_, _) => node,
-            Node::List(_) | Node::Paragraph(_) | Node::CodeBlock(_, _) => {
-                panic!("expected Node::Heading at end of heading")
-            },
-        };
-
-        match self.current.last_mut() {
-            None => self.complete.push(heading),
-            _ => todo!("start nested heading"),
-        }
-    }
-
-    fn end_code_block(&mut self) {
-        let code_block = match self.current.pop().unwrap() {
-            node @ Node::CodeBlock(_, _) => node,
-            Node::List(_) | Node::Paragraph(_) | Node::Heading(_, _) => {
-                panic!("expected Node::Heading at end of code block")
-            },
-        };
-
-        match self.current.last_mut() {
-            None => self.complete.push(code_block),
-            _ => todo!("end nested code block"),
-        }
-    }
+    complete
 }
 
-fn start_paragraph(nodes: &mut Vec<Node>) {
-    match nodes.last_mut() {
-        Some(Node::Paragraph(prev_paragraph)) => {
-            debug_assert!(!prev_paragraph.is_empty());
+fn unwrap_text(
+    events: Vec<UnflattenedEvent>,
+    mut styles: HashSet<TextStyle>,
+) -> Vec<TextSpan> {
+    let mut text_spans: Vec<TextSpan> = vec![];
 
-            nodes.push(Node::Paragraph(vec![]));
-        },
-        Some(Node::List(list_items)) => {
-            // debug_assert!(!matches!(inner_nodes.last(), Some(Node::Paragraph(_))));
-
-            // TODO: Add test that this is not `nodes.push(..)`.
-            // * hello
-            //   - world
-            //
-            //     how are you
-            //
-            //   doing today?
-            match list_items.last_mut() {
-                // TODO: Test this control flow path.
-                Some(ListItem(inner_nodes)) => {
-                    inner_nodes.push(Node::Paragraph(vec![]));
+    for event in events {
+        match event {
+            UnflattenedEvent::Event(event) => match event {
+                Event::Start(_) | Event::End(_) => unreachable!(),
+                Event::Text(text) => {
+                    text_spans.push(TextSpan::Text(text.to_string(), styles.clone()))
                 },
-                // TODO: Test this control flow path.
-                None => list_items.push(ListItem(vec![Node::Paragraph(vec![])])),
-            }
-        },
-        Some(Node::Heading(_, _)) => nodes.push(Node::Paragraph(vec![])),
-        Some(Node::CodeBlock(_, _)) => panic!("paragraph nested inside code block"),
-        None => nodes.push(Node::Paragraph(vec![])),
+                Event::Code(code) => text_spans.push(TextSpan::Code(code.to_string())),
+                Event::SoftBreak => text_spans.push(TextSpan::SoftBreak),
+                Event::HardBreak => text_spans.push(TextSpan::HardBreak),
+                Event::Html(_) => eprintln!("warning: skipping inline HTML"),
+                Event::TaskListMarker(_) | Event::Rule | Event::FootnoteReference(_) => {
+                    todo!("handle: {event:?}")
+                },
+            },
+            UnflattenedEvent::Nested { tag, events } => match tag {
+                Tag::Emphasis => {
+                    styles.insert(TextStyle::Emphasis);
+                    text_spans.extend(unwrap_text(events, styles.clone()));
+                },
+                Tag::Strong => {
+                    styles.insert(TextStyle::Strong);
+                    text_spans.extend(unwrap_text(events, styles.clone()));
+                },
+                Tag::Strikethrough => {
+                    styles.insert(TextStyle::Strikethrough);
+                    text_spans.extend(unwrap_text(events, styles.clone()));
+                },
+                Tag::Link(link_type, destination, label) => {
+                    let text = unwrap_text(events, HashSet::new());
+
+                    if !label.is_empty() {
+                        eprintln!("warning: link label is ignored: {label:?}");
+                    }
+
+                    match link_type {
+                        LinkType::Inline => (),
+                        _ => todo!("support non-inline link type: {link_type:?} (destination: {destination})"),
+                    }
+
+                    text_spans.push(TextSpan::Link {
+                        label: text,
+                        destination: destination.to_string(),
+                    })
+                },
+                _ => todo!("handle {tag:?}"),
+            },
+        }
     }
+
+    text_spans
 }
 
 //======================================
@@ -294,9 +321,11 @@ fn start_paragraph(nodes: &mut Vec<Node>) {
 
 #[test]
 fn tests() {
+    use pretty_assertions::assert_eq;
+
     assert_eq!(
         parse_markdown_to_ast("hello"),
-        vec![Node::Paragraph(vec![TextNode::Text(
+        vec![Block::Paragraph(vec![TextSpan::Text(
             "hello".into(),
             HashSet::new()
         )])]
@@ -308,7 +337,7 @@ fn tests() {
 
     assert_eq!(
         parse_markdown_to_ast("*hello*"),
-        vec![Node::Paragraph(vec![TextNode::Text(
+        vec![Block::Paragraph(vec![TextSpan::Text(
             "hello".into(),
             HashSet::from_iter(vec![TextStyle::Emphasis])
         )])]
@@ -316,7 +345,7 @@ fn tests() {
 
     assert_eq!(
         parse_markdown_to_ast("**hello**"),
-        vec![Node::Paragraph(vec![TextNode::Text(
+        vec![Block::Paragraph(vec![TextSpan::Text(
             "hello".into(),
             HashSet::from_iter(vec![TextStyle::Strong])
         )])]
@@ -324,7 +353,7 @@ fn tests() {
 
     assert_eq!(
         parse_markdown_to_ast("~~hello~~"),
-        vec![Node::Paragraph(vec![TextNode::Text(
+        vec![Block::Paragraph(vec![TextSpan::Text(
             "hello".into(),
             HashSet::from_iter(vec![TextStyle::Strikethrough])
         )])]
@@ -336,8 +365,8 @@ fn tests() {
 
     assert_eq!(
         parse_markdown_to_ast("* hello"),
-        vec![Node::List(vec![ListItem(vec![Node::Paragraph(vec![
-            TextNode::Text("hello".into(), HashSet::new())
+        vec![Block::List(vec![ListItem(vec![Block::Paragraph(vec![
+            TextSpan::Text("hello".into(), HashSet::new())
         ])])])]
     );
 
@@ -345,8 +374,8 @@ fn tests() {
 
     assert_eq!(
         parse_markdown_to_ast("* *hello*"),
-        vec![Node::List(vec![ListItem(vec![Node::Paragraph(vec![
-            TextNode::Text(
+        vec![Block::List(vec![ListItem(vec![Block::Paragraph(vec![
+            TextSpan::Text(
                 "hello".into(),
                 HashSet::from_iter(vec![TextStyle::Emphasis])
             )
@@ -355,15 +384,15 @@ fn tests() {
 
     assert_eq!(
         parse_markdown_to_ast("* **hello**"),
-        vec![Node::List(vec![ListItem(vec![Node::Paragraph(vec![
-            TextNode::Text("hello".into(), HashSet::from_iter(vec![TextStyle::Strong]))
+        vec![Block::List(vec![ListItem(vec![Block::Paragraph(vec![
+            TextSpan::Text("hello".into(), HashSet::from_iter(vec![TextStyle::Strong]))
         ])])])]
     );
 
     assert_eq!(
         parse_markdown_to_ast("* ~~hello~~"),
-        vec![Node::List(vec![ListItem(vec![Node::Paragraph(vec![
-            TextNode::Text(
+        vec![Block::List(vec![ListItem(vec![Block::Paragraph(vec![
+            TextSpan::Text(
                 "hello".into(),
                 HashSet::from_iter(vec![TextStyle::Strikethrough])
             )
