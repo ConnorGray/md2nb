@@ -45,6 +45,11 @@ fn main() -> Result<(), kernel::Error> {
     // Determine the output file location
     //----------------------------------------------------------------
 
+    // Make `output` into an absolute path. We need to resolve this relative to the
+    // current process's working directory, and before we pass it into the Wolfram Kernel
+    // process in NotebookSave.
+    let output = output.map(|output| output.canonicalize().unwrap());
+
     // If `output` is a directory, automatically determine the file name from `input`.
     // E.g. `$ md2nb README.md` will automatically write to `./README.nb`.
     let auto_file_name = format!("{}.nb", input.file_stem().unwrap().to_str().unwrap());
