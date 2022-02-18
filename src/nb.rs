@@ -180,7 +180,8 @@ fn text_to_boxes(text: Vec<TextSpan>) -> Expr {
                     ),
                 ],
             )),
-            TextSpan::SoftBreak | TextSpan::HardBreak => todo!("handle {span:?}"),
+            TextSpan::SoftBreak => row.push(Expr::string(" ")),
+            TextSpan::HardBreak => todo!("handle {span:?}"),
         }
     }
 
