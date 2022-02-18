@@ -399,3 +399,230 @@ fn tests() {
         ])])])]
     );
 }
+
+#[test]
+fn test_structure() {
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
+    assert_eq!(
+        parse_markdown_to_ast(indoc!(
+            "
+            * hello
+
+              world
+            "
+        )),
+        vec![Block::List(vec![ListItem(vec![
+            Block::Paragraph(vec![TextSpan::Text("hello".into(), Default::default())]),
+            Block::Paragraph(vec![TextSpan::Text("world".into(), Default::default())])
+        ])])]
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+        parse_markdown_to_ast(indoc!(
+            "
+            # Example
+
+            * A
+              - A.A
+
+                hello world
+
+                * *A.A.A*
+            "
+        )),
+        vec![
+            Block::Heading(
+                HeadingLevel::H1,
+                vec![TextSpan::Text("Example".into(), Default::default())]
+            ),
+            Block::List(vec![
+                ListItem(vec![
+                    Block::Paragraph(vec![TextSpan::Text("A".into(), Default::default())]),
+                    Block::List(vec![
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.A".into(), Default::default())]),
+                            Block::Paragraph(vec![TextSpan::Text("hello world".into(), Default::default())]),
+                            Block::List(vec![
+                                ListItem(vec![
+                                    Block::Paragraph(vec![
+                                        TextSpan::Text(
+                                            "A.A.A".into(),
+                                            HashSet::from_iter([TextStyle::Emphasis])
+                                        )
+                                    ])
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ])
+        ]
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+        parse_markdown_to_ast(indoc!(
+            "
+            * A
+              - A.A
+                * A.A.A
+              - A.B
+              - A.C
+            "
+        )),
+        vec![
+            Block::List(vec![
+                ListItem(vec![
+                    Block::Paragraph(vec![TextSpan::Text("A".into(), Default::default())]),
+                    Block::List(vec![
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.A".into(), Default::default())]),
+                            Block::List(vec![ListItem(vec![
+                                Block::Paragraph(vec![TextSpan::Text("A.A.A".into(), Default::default())]),
+                            ])])
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.B".into(), Default::default())]),
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.C".into(), Default::default())]),
+                        ])
+                    ])
+                ])
+            ])
+        ]
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+        parse_markdown_to_ast(indoc!(
+            "
+            # Example
+
+            * A
+              - A.A
+              - A.B
+              * A.C
+            "
+        )),
+        vec![
+            Block::Heading(
+                HeadingLevel::H1,
+                vec![TextSpan::Text("Example".into(), Default::default())]
+            ),
+            Block::List(vec![
+                ListItem(vec![
+                    Block::Paragraph(vec![TextSpan::Text("A".into(), Default::default())]),
+                    Block::List(vec![
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.A".into(), Default::default())]),
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.B".into(), Default::default())]),
+                        ]),
+                    ]),
+                    Block::List(vec![
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.C".into(), Default::default())])
+                        ])
+                    ]),
+                ]),
+            ])
+        ]
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+        parse_markdown_to_ast(indoc!(
+            "
+            * A
+              - A.A
+              - A.B
+
+                separate paragraph
+
+              - A.C
+            "
+        )),
+        vec![
+            Block::List(vec![
+                ListItem(vec![
+                    Block::Paragraph(vec![TextSpan::Text("A".into(), Default::default())]),
+                    Block::List(vec![
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.A".into(), Default::default())]),
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.B".into(), Default::default())]),
+                            Block::Paragraph(vec![TextSpan::Text("separate paragraph".into(), Default::default())]),
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.C".into(), Default::default())]),
+                        ])
+                    ])
+                ])
+            ])
+        ]
+    );
+
+    #[rustfmt::skip]
+    assert_eq!(
+        parse_markdown_to_ast(indoc!(
+            "
+            # Example
+
+            * A
+              - A.A
+                * A.A.A
+                  **soft break**
+
+              - A.B
+
+                separate paragraph
+
+              - A.C
+            "
+        )),
+        vec![
+            Block::Heading(
+                HeadingLevel::H1,
+                vec![TextSpan::Text("Example".into(), Default::default())]
+            ),
+            Block::List(vec![
+                ListItem(vec![
+                    Block::Paragraph(vec![TextSpan::Text("A".into(), Default::default())]),
+                    Block::List(vec![
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.A".into(), Default::default())]),
+                            Block::List(vec![
+                                ListItem(vec![
+                                    Block::Paragraph(vec![
+                                        TextSpan::Text(
+                                            "A.A.A".into(),
+                                            Default::default(),
+                                        ),
+                                        TextSpan::SoftBreak,
+                                        TextSpan::Text(
+                                            "soft break".into(),
+                                            HashSet::from_iter([TextStyle::Strong])
+                                        )
+                                    ]),
+                                ])
+                            ]),
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.B".into(), Default::default())]),
+                            Block::Paragraph(vec![TextSpan::Text("separate paragraph".into(), Default::default())]),
+                        ]),
+                        ListItem(vec![
+                            Block::Paragraph(vec![TextSpan::Text("A.C".into(), Default::default())]),
+                        ]),
+                    ])
+                ])
+            ])
+        ]
+    );
+}
