@@ -24,3 +24,26 @@ fn it_also_has_code_block() {
     println!("hello world!");
 }
 ```
+
+##### Conversion of languages supported by `"ExternalLanguage"` cells
+
+```python
+for c in "python":
+  print(c)
+```
+
+```shell
+echo $HOME
+```
+
+#### Block quotes
+
+> This is a single-line block quote.
+
+This is some content in between.
+
+> This is a multiline block quote.
+> It just goes on and on. It will word wrap automatically when viewed in a Wolfram
+> Notebook.
+>
+> Empty lines within the block quote will render as empty lines in the notebook.

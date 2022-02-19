@@ -4,17 +4,22 @@ use wolfram_expr::{Expr, Symbol};
 
 use crate::ast::{Block, ListItem, TextSpan, TextStyle};
 
+#[derive(Debug, Clone)]
+pub struct Options {
+    pub create_external_language_cells: bool,
+}
+
 struct State {
     list_depth: u8,
 }
 
-pub fn block_to_cells(block: Block) -> Vec<Expr> {
+pub fn block_to_cells(block: Block, opts: &Options) -> Vec<Expr> {
     let mut state = State { list_depth: 0 };
 
-    block_to_cells_(&mut state, block)
+    block_to_cells_(&mut state, opts, block)
 }
 
-fn block_to_cells_(state: &mut State, block: Block) -> Vec<Expr> {
+fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr> {
     match block {
         Block::Heading(level, text) => {
             let style = match level {
@@ -48,11 +53,88 @@ fn block_to_cells_(state: &mut State, block: Block) -> Vec<Expr> {
 
             list_cells
         },
-        Block::CodeBlock(_, code_text) => {
-            vec![Expr::normal(
+        Block::CodeBlock(label, code_text) => {
+            let external_language: Option<&str> =
+                // The languages listed here should be all of those currently supported
+                // by ExternalEvaluate.
+                match label.map(|s| s.to_lowercase()).as_deref() {
+                    Some("python") => Some("Python"),
+                    Some("shell" | "bash" | "sh" | "zsh") => Some("Shell"),
+                    Some("julia") => Some("Julia"),
+                    Some("r") => Some("R"),
+                    Some("octave") => Some("Octave"),
+                    Some("java") => Some("Java"),
+                    Some("node" | "nodejs" | "js" | "javascript") => Some("NodeJS"),
+                    Some("jupyter") => Some("Jupyter"),
+                    Some("sql") => Some("SQL"),
+                    Some("sql-jdbc") => Some("SQL-JDBC"),
+                    Some(_) => None,
+                    None => None,
+                };
+
+            match external_language {
+                // Only create "ExternalLanguage" cells if the option is set (enabled by
+                // default).
+                Some(lang) if opts.create_external_language_cells => {
+                    vec![Expr::normal(
+                        Symbol::new("System`Cell"),
+                        vec![
+                            Expr::string(code_text),
+                            Expr::string("ExternalLanguage"),
+                            Expr::rule(
+                                Symbol::new("System`CellEvaluationLanguage"),
+                                Expr::string(lang),
+                            ),
+                        ],
+                    )]
+                },
+                _ => {
+                    vec![Expr::normal(
+                        Symbol::new("System`Cell"),
+                        vec![Expr::string(code_text), Expr::string("Program")],
+                    )]
+                },
+            }
+        },
+        Block::BlockQuote(quote) => {
+            // TODO: Use a dedicated "BlockQuote" cell style. There is no "BlockQuote"
+            //       style in the default Wolfram notebook stylesheet, but we could add
+            //       a StyleData definition to this notebook.
+            let cell = Expr::normal(
                 Symbol::new("System`Cell"),
-                vec![Expr::string(code_text), Expr::string("Program")],
-            )]
+                vec![
+                    Expr::string(quote),
+                    Expr::string("Text"),
+                    // Only the left side should have a frame:
+                    //   CellFrame -> {{4, 0}, {0, 0}}
+                    Expr::rule(
+                        Symbol::new("System`CellFrame"),
+                        Expr::list(vec![
+                            Expr::list(vec![Expr::from(4), Expr::from(0)]),
+                            Expr::list(vec![Expr::from(0), Expr::from(0)]),
+                        ]),
+                    ),
+                    // The cell frame should have a medium-light gray color:
+                    //   CellFrameColor -> GrayLevel[0.8]
+                    Expr::rule(
+                        Symbol::new("System`CellFrameColor"),
+                        Expr::normal(
+                            Symbol::new("System`GrayLevel"),
+                            vec![Expr::real(0.8)],
+                        ),
+                    ),
+                    // The cell background should be a light gray color:
+                    //   Background -> GrayLevel[0.95]
+                    Expr::rule(
+                        Symbol::new("System`Background"),
+                        Expr::normal(
+                            Symbol::new("System`GrayLevel"),
+                            vec![Expr::real(0.95)],
+                        ),
+                    ),
+                ],
+            );
+            vec![cell]
         },
         Block::Rule => todo!("handle markdown Rule"),
     }
@@ -89,6 +171,9 @@ fn list_item_to_cells(state: &mut State, ListItem(blocks): ListItem) -> Vec<Expr
                 state.list_depth -= 1;
 
                 cells.extend(list_cells);
+            },
+            Block::BlockQuote(_) => {
+                todo!("handle markdown block quote inside list items")
             },
             Block::Heading(_, _) => todo!("handle markdown headings inside list items"),
             Block::CodeBlock(_, _) => {

@@ -25,6 +25,7 @@ pub enum Block {
     List(Vec<ListItem>),
     Heading(HeadingLevel, Vec<TextSpan>),
     CodeBlock(Option<String>, String),
+    BlockQuote(String),
     Rule,
 }
 
@@ -108,6 +109,7 @@ fn is_inline(event: &UnflattenedEvent) -> bool {
             Tag::List(_) => false,
             Tag::Item => false,
             Tag::CodeBlock(_) => false,
+            Tag::BlockQuote => false,
             _ => todo!("handle tag: {tag:?}"),
         },
     }
@@ -228,20 +230,15 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                         };
 
                         let text_spans = unwrap_text(events, Default::default());
-
-                        let mut code_text = String::new();
-
-                        for span in text_spans {
-                            match span {
-                                TextSpan::Text(text, styles) => {
-                                    assert!(styles.is_empty());
-                                    code_text.push_str(&text);
-                                },
-                                _ => todo!("handle span: {span:?}"),
-                            }
-                        }
+                        let code_text = text_spans_to_string(text_spans);
 
                         complete.push(Block::CodeBlock(fence_label, code_text))
+                    },
+                    Tag::BlockQuote => {
+                        let text_spans = unwrap_text(events, Default::default());
+                        let string = text_spans_to_string(text_spans);
+
+                        complete.push(Block::BlockQuote(string))
                     },
                     _ => todo!("handle: {tag:?}"),
                 }
@@ -290,6 +287,15 @@ fn unwrap_text(
                     styles.insert(TextStyle::Strikethrough);
                     text_spans.extend(unwrap_text(events, styles.clone()));
                 },
+                Tag::Paragraph => {
+                    // If this is a separate paragraph, insert a hardbreak. Don't insert
+                    // a hardbreak if there isn't any existing text content, to avoid
+                    // having a leading empty line.
+                    if !text_spans.is_empty() {
+                        text_spans.push(TextSpan::HardBreak);
+                    }
+                    text_spans.extend(unwrap_text(events, styles.clone()))
+                },
                 Tag::Link(link_type, destination, label) => {
                     let text = unwrap_text(events, HashSet::new());
 
@@ -313,6 +319,31 @@ fn unwrap_text(
     }
 
     text_spans
+}
+
+fn text_spans_to_string(text_spans: Vec<TextSpan>) -> String {
+    let mut string = String::new();
+
+    for span in text_spans {
+        match span {
+            TextSpan::Text(text, styles) => {
+                if !styles.is_empty() {
+                    todo!("support text style(s) `{styles:?}` in string {text:?}");
+                }
+
+                string.push_str(&text);
+            },
+            TextSpan::SoftBreak => {
+                string.push_str(" ");
+            },
+            TextSpan::HardBreak => {
+                string.push_str("\n\n");
+            },
+            _ => todo!("handle span: {span:?}"),
+        }
+    }
+
+    string
 }
 
 //======================================

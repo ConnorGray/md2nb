@@ -23,10 +23,19 @@ struct Args {
     /// If this is a directory, the output notebook file will have the same file name
     /// as the input file.
     output: Option<PathBuf>,
+
+    /// If set, disables conversion of code blocks to "ExternalLanguage" cells. Code
+    /// blocks will instead be converted to inert "Program" cells.
+    #[clap(long)]
+    no_external_language_cells: bool,
 }
 
 fn main() -> Result<(), kernel::Error> {
-    let Args { input, output } = Args::parse();
+    let Args {
+        input,
+        output,
+        no_external_language_cells,
+    } = Args::parse();
 
     let contents: String =
         std::fs::read_to_string(&input).expect("failed to read input file");
@@ -41,9 +50,17 @@ fn main() -> Result<(), kernel::Error> {
     println!("\n\n===== End AST =====\n");
     */
 
-    //----------------------------------------------------------------
+    //------------------------------------------------------------------
+    // Parse the command-line options into notebook conversion `Options`
+    //------------------------------------------------------------------
+
+    let nb_options = nb::Options {
+        create_external_language_cells: !no_external_language_cells,
+    };
+
+    //-----------------------------------
     // Determine the output file location
-    //----------------------------------------------------------------
+    //-----------------------------------
 
     // Make `output` into an absolute path. We need to resolve this relative to the
     // current process's working directory, and before we pass it into the Wolfram Kernel
@@ -74,7 +91,10 @@ fn main() -> Result<(), kernel::Error> {
     // Convert the Markdown AST to a sequence of Cell[..] expressions.
     //----------------------------------------------------------------
 
-    let cells: Vec<Expr> = ast.into_iter().flat_map(nb::block_to_cells).collect();
+    let cells: Vec<Expr> = ast
+        .into_iter()
+        .flat_map(|block| nb::block_to_cells(block, &nb_options))
+        .collect();
 
     //----------------------------------------------------------
     // Launch the Kernel, and write the cells to a new notebook.
