@@ -28,6 +28,13 @@ impl From<std::io::Error> for Error {
 
 impl KernelProcess {
     /// Launch a new Wolfram Kernel child process and establish a WSTP connection with it.
+    ///
+    /// See also the [wolfram-app-discovery](https://crates.io/crates/wolfram-app-discovery)
+    /// crate, whose
+    /// [`WolframApp::kernel_executable_path()`](https://docs.rs/wolfram-app-discovery/0.2.0/wolfram_app_discovery/struct.WolframApp.html#method.kernel_executable_path)
+    /// method can be used to get the location of a
+    /// [`WolframKernel`](https://reference.wolfram.com/language/ref/program/WolframKernel.html)
+    /// executable suitable for use with this function.
     //
     // TODO: Would it be correct to describe this as essentially `LinkLaunch`? Also note
     //       that this doesn't actually use `-linkmode launch`.
