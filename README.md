@@ -25,7 +25,7 @@ $ md2nb <INPUT>.md <OUTPUT>.nb
 For example, to convert this project's `README.md` file into a Wolfram Notebook, execute:
 
 ```shell
-$ md2nb README.nb README.nb
+$ md2nb README.md README.nb
 ```
 
 ## Installation
