@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 pulldown-cmark = "0.9.1"
 
-wolfram-app-discovery = "0.1.2"
+wolfram-app-discovery = "0.2.0"
 wolfram-expr = "0.1.1"
 # wstp = "0.1.3"
 wstp = { path = "../../WolframResearch/wstp-rs" }
