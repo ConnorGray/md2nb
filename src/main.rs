@@ -1,5 +1,4 @@
 mod ast;
-mod kernel;
 mod nb;
 
 
@@ -9,8 +8,7 @@ use clap::Parser;
 
 use wolfram_app_discovery::WolframApp;
 use wolfram_expr::{Expr, Symbol};
-
-use crate::kernel::KernelProcess;
+use wstp::kernel::{self, WolframKernelProcess};
 
 /// Discovery local installations of the Wolfram Language and Wolfram products.
 #[derive(Parser, Debug)]
@@ -107,6 +105,7 @@ fn main() -> Result<(), kernel::Error> {
     for cell in cells {
         // NotebookWrite[nb_obj, cell]
         kernel
+            .link()
             .put_eval_packet(&using_front_end(Expr::normal(
                 Symbol::new("System`NotebookWrite"),
                 vec![nb_obj.clone(), cell],
@@ -116,6 +115,7 @@ fn main() -> Result<(), kernel::Error> {
 
     // NotebookSave[nb_obj, output]
     kernel
+        .link()
         .put_eval_packet(&using_front_end(Expr::normal(
             Symbol::new("System`NotebookSave"),
             vec![
@@ -143,24 +143,26 @@ fn using_front_end(expr: Expr) -> Expr {
     Expr::normal(Symbol::new("System`UsingFrontEnd"), vec![expr])
 }
 
-fn create_notebook(kernel: &mut KernelProcess) -> Result<Expr, kernel::Error> {
-    let () = kernel.put_eval_packet(&using_front_end(Expr::normal(
-        Symbol::new("System`CreateNotebook"),
-        vec![],
-    )))?;
+fn create_notebook(kernel: &mut WolframKernelProcess) -> Result<Expr, kernel::Error> {
+    let () = kernel
+        .link()
+        .put_eval_packet(&using_front_end(Expr::normal(
+            Symbol::new("System`CreateNotebook"),
+            vec![],
+        )))?;
 
     skip_to_next_return_packet(kernel.link())?;
 
     Ok(get_system_expr(kernel.link())?)
 }
 
-fn launch_default_kernel() -> Result<KernelProcess, kernel::Error> {
+fn launch_default_kernel() -> Result<WolframKernelProcess, kernel::Error> {
     let app = WolframApp::try_default()
         .expect("unable to find any Wolfram Language installations");
 
     let kernel = app.kernel_executable_path().unwrap();
 
-    KernelProcess::launch(&kernel)
+    WolframKernelProcess::launch(&kernel)
 }
 
 fn skip_to_next_return_packet(link: &mut wstp::Link) -> Result<(), wstp::Error> {
@@ -195,15 +197,15 @@ fn dump_tokens(link: &mut wstp::Link, indent: usize) -> Result<(), wstp::Error> 
 
     let pad = format!("{:indent$}", "");
 
-    let value = link.get()?;
+    let token = link.get_token()?;
 
-    match value {
+    match token {
         Token::Integer(value) => println!("token: {pad}{value}"),
         Token::Real(value) => println!("token: {pad}{value}"),
         Token::String(value) => println!("token: {pad}{}", value.as_str()),
         Token::Symbol(value) => println!("token: {pad}{}", value.as_str()),
-        Token::Normal(length) => {
-            drop(value);
+        Token::Function { length } => {
+            drop(token);
 
             dump_tokens(link, indent)?;
 
