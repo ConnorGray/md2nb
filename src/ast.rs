@@ -26,6 +26,10 @@ pub enum Block {
     Heading(HeadingLevel, Vec<TextSpan>),
     CodeBlock(Option<String>, String),
     BlockQuote(String),
+    Table {
+        headers: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
     Rule,
 }
 
@@ -110,6 +114,8 @@ fn is_inline(event: &UnflattenedEvent) -> bool {
             Tag::Item => false,
             Tag::CodeBlock(_) => false,
             Tag::BlockQuote => false,
+            Tag::Table(_) => false,
+            Tag::TableHead | Tag::TableRow => unreachable!(),
             _ => todo!("handle tag: {tag:?}"),
         },
     }
@@ -240,6 +246,55 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
 
                         complete.push(Block::BlockQuote(string))
                     },
+                    // TODO: Support table column alignments.
+                    Tag::Table(_alignments) => {
+                        let mut events = events.into_iter();
+                        let header_events = match events.next().unwrap() {
+                            UnflattenedEvent::Event(_) => panic!(),
+                            UnflattenedEvent::Nested { tag, events } => {
+                                assert!(tag == Tag::TableHead);
+                                events
+                            },
+                        };
+
+                        let mut headers = Vec::new();
+
+                        for table_cell in header_events {
+                            let table_cell_spans = unwrap_text(
+                                unwrap_table_cell(table_cell),
+                                HashSet::new(),
+                            );
+
+                            headers.push(text_spans_to_string(table_cell_spans));
+                        }
+
+                        let mut rows = Vec::new();
+
+                        for row_events in events {
+                            let row_events = match row_events {
+                                UnflattenedEvent::Event(_) => panic!(),
+                                UnflattenedEvent::Nested { tag, events } => {
+                                    assert!(tag == Tag::TableRow);
+                                    events
+                                },
+                            };
+
+                            let mut row = Vec::new();
+
+                            for table_cell in row_events {
+                                let table_cell_spans = unwrap_text(
+                                    unwrap_table_cell(table_cell),
+                                    HashSet::new(),
+                                );
+
+                                row.push(text_spans_to_string(table_cell_spans));
+                            }
+
+                            rows.push(row);
+                        }
+
+                        complete.push(Block::Table { headers, rows })
+                    },
                     _ => todo!("handle: {tag:?}"),
                 }
             },
@@ -319,6 +374,16 @@ fn unwrap_text(
     }
 
     text_spans
+}
+
+fn unwrap_table_cell(event: UnflattenedEvent) -> Vec<UnflattenedEvent> {
+    match event {
+        UnflattenedEvent::Event(_) => panic!(),
+        UnflattenedEvent::Nested { tag, events } => {
+            assert_eq!(tag, Tag::TableCell, "expected to get Tag::TableCell");
+            events
+        },
+    }
 }
 
 fn text_spans_to_string(text_spans: Vec<TextSpan>) -> String {

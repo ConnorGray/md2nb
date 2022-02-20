@@ -47,3 +47,11 @@ This is some content in between.
 > Notebook.
 >
 > Empty lines within the block quote will render as empty lines in the notebook.
+
+#### Tables
+
+| Column A | Column B | Third Column |
+|----------|----------|--------------|
+| Foo      | Fizz     | ✅           |
+| Baz      | Buzz     | ❌           |
+| This is a row with some longer content, that might even word wrap. | Content in separate columns will word wrap separately. | ❔ |

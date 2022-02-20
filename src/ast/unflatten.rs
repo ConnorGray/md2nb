@@ -24,6 +24,7 @@ pub(crate) fn parse_markdown_to_unflattened_events(input: &str) -> Vec<Unflatten
     // and we therefore must enable it explicitly.
     let mut options = md::Options::empty();
     options.insert(md::Options::ENABLE_STRIKETHROUGH);
+    options.insert(md::Options::ENABLE_TABLES);
     let parser = md::Parser::new_ext(input, options);
 
     let mut unflattener = Unflattener {

@@ -136,6 +136,71 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
             );
             vec![cell]
         },
+        Block::Table { headers, rows } => {
+            let mut grid_rows: Vec<Expr> = Vec::new();
+
+            let header_row = headers
+                .into_iter()
+                .map(|content: String| {
+                    Expr::normal(
+                        Symbol::new("System`Cell"),
+                        vec![Expr::string(content), Expr::from("Subsubsubsection")],
+                    )
+                })
+                .collect();
+
+            grid_rows.push(Expr::list(header_row));
+
+            for row_content in rows {
+                let row: Vec<Expr> = row_content
+                    .into_iter()
+                    .map(|content: String| {
+                        Expr::normal(
+                            Symbol::new("System`Cell"),
+                            vec![Expr::string(content), Expr::from("Text")],
+                        )
+                    })
+                    .collect();
+
+                grid_rows.push(Expr::list(row));
+            }
+
+            let grid_box = Expr::normal(
+                Symbol::new("System`GridBox"),
+                vec![
+                    Expr::list(grid_rows),
+                    // GridBoxItemSize -> {
+                    //     "Columns" -> {{Automatic}},
+                    //     "Rows" -> {{Automatic}}
+                    // }
+                    Expr::rule(
+                        Symbol::new("System`GridBoxItemSize"),
+                        Expr::list(vec![
+                            Expr::rule(
+                                Expr::from("Columns"),
+                                Expr::list(vec![Expr::list(vec![Expr::from(
+                                    Symbol::new("System`Automatic"),
+                                )])]),
+                            ),
+                            Expr::rule(
+                                Expr::from("Rows"),
+                                Expr::list(vec![Expr::list(vec![Expr::from(
+                                    Symbol::new("System`Automatic"),
+                                )])]),
+                            ),
+                        ]),
+                    ),
+                ],
+            );
+
+            vec![Expr::normal(
+                Symbol::new("System`Cell"),
+                vec![
+                    Expr::normal(Symbol::new("System`BoxData"), vec![grid_box]),
+                    Expr::from("Text"),
+                ],
+            )]
+        },
         Block::Rule => todo!("handle markdown Rule"),
     }
 }
@@ -179,6 +244,7 @@ fn list_item_to_cells(state: &mut State, ListItem(blocks): ListItem) -> Vec<Expr
             Block::CodeBlock(_, _) => {
                 todo!("handle markdown code block inside list item")
             },
+            Block::Table { .. } => todo!("handle markdown table inside list item"),
             Block::Rule => todo!("handle markdown rule inside list item"),
         }
     }
