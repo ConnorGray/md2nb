@@ -2,7 +2,7 @@ mod ast;
 mod nb;
 
 
-use std::path::PathBuf;
+use std::{path::PathBuf, process};
 
 use clap::Parser;
 
@@ -22,6 +22,10 @@ struct Args {
     /// as the input file.
     output: Option<PathBuf>,
 
+    /// Opens the notebook after conversion completes
+    #[clap(long)]
+    open: bool,
+
     /// If set, disables conversion of code blocks to "ExternalLanguage" cells. Code
     /// blocks will instead be converted to inert "Program" cells.
     #[clap(long)]
@@ -33,6 +37,7 @@ fn main() -> Result<(), kernel::Error> {
         input,
         output,
         no_external_language_cells,
+        open,
     } = Args::parse();
 
     let contents: String =
@@ -129,7 +134,48 @@ fn main() -> Result<(), kernel::Error> {
         )))
         .unwrap();
 
+    //-----------------------------------------------------
+    // Send `Quit[]` to the Kernel and wait for it to exit.
+    //-----------------------------------------------------
+
+    kernel
+        .link()
+        .put_eval_packet(&Expr::from(Expr::normal(
+            Symbol::new("System`Quit"),
+            vec![],
+        )))
+        .unwrap();
+
+    // Wait until the Kernel has shut down before proceeding.
+    // If we don't wait for the previous evaluations to finish, then the output
+    // file may not have been written yet if we try to `--open` it below.
+    loop {
+        match kernel.link().get_token() {
+            Ok(_) => (),
+            Err(err) => {
+                if err.code() != Some(wstp::sys::WSECLOSED) {
+                    println!("error: unexpected Kernel WSTP connection error: {err}");
+                }
+                break;
+            },
+        }
+    }
+
     drop(kernel);
+
+    //----------------------------------------------------------------------------
+    // If `--open` was specified, open the output file in the default application.
+    //----------------------------------------------------------------------------
+
+    if open {
+        if cfg!(target_os = "macos") {
+            if let Err(err) = process::Command::new("open").arg(&output).output() {
+                eprintln!("error: `--open` failed: {err}")
+            }
+        } else {
+            eprintln!("warning: `--open` is not supported on this platform.")
+        }
+    }
 
     unsafe {
         // Shut the WSTP library down gracefully.
