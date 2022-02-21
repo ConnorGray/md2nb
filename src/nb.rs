@@ -2,7 +2,7 @@ use pulldown_cmark::HeadingLevel;
 
 use wolfram_expr::{Expr, Symbol};
 
-use crate::ast::{Block, ListItem, TextSpan, TextStyle};
+use crate::ast::{Block, ListItem, Text, TextSpan, TextStyle};
 
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -253,12 +253,12 @@ fn list_item_to_cells(state: &mut State, ListItem(blocks): ListItem) -> Vec<Expr
 }
 
 /// Returns a `TextData[{...}]` expression.
-fn text_to_text_data(text: Vec<TextSpan>) -> Expr {
+fn text_to_text_data(text: Text) -> Expr {
     Expr::normal(Symbol::new("System`TextData"), vec![text_to_boxes(text)])
 }
 
 // Returns a `RowBox[{...}]` expression.
-fn text_to_boxes(text: Vec<TextSpan>) -> Expr {
+fn text_to_boxes(text: Text) -> Expr {
     let mut row = Vec::new();
 
     for span in text {
