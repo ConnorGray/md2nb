@@ -19,6 +19,9 @@ use self::unflatten::UnflattenedEvent;
 //======================================
 
 /// A piece of structural Markdown content.
+///
+/// *CommonMark Spec:* [blocks](https://spec.commonmark.org/0.30/#blocks),
+/// [container blocks](https://spec.commonmark.org/0.30/#container-blocks)
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
     Paragraph(Text),
