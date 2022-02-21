@@ -182,20 +182,12 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
 
                     Tag::Link(link_type, destination, label) => {
                         let text = unwrap_text(events, HashSet::new());
-
-                        if !label.is_empty() {
-                            eprintln!("warning: link label is ignored: {label:?}");
-                        }
-
-                        match link_type {
-                            LinkType::Inline => (),
-                            _ => todo!("support non-inline link type: {link_type:?} (destination: {destination})"),
-                        }
-
-                        text_spans.push(TextSpan::Link {
-                            label: text,
-                            destination: destination.to_string(),
-                        })
+                        text_spans.push(TextSpan::from_link(
+                            link_type,
+                            text,
+                            destination.to_string(),
+                            label.to_string(),
+                        ))
                     },
 
                     //
@@ -358,20 +350,12 @@ fn unwrap_text(events: Vec<UnflattenedEvent>, mut styles: HashSet<TextStyle>) ->
                 },
                 Tag::Link(link_type, destination, label) => {
                     let text = unwrap_text(events, HashSet::new());
-
-                    if !label.is_empty() {
-                        eprintln!("warning: link label is ignored: {label:?}");
-                    }
-
-                    match link_type {
-                        LinkType::Inline => (),
-                        _ => todo!("support non-inline link type: {link_type:?} (destination: {destination})"),
-                    }
-
-                    text_spans.push(TextSpan::Link {
-                        label: text,
-                        destination: destination.to_string(),
-                    })
+                    text_spans.push(TextSpan::from_link(
+                        link_type,
+                        text,
+                        destination.to_string(),
+                        label.to_string(),
+                    ))
                 },
                 _ => todo!("handle {tag:?}"),
             },
@@ -419,6 +403,29 @@ fn text_to_string(Text(text_spans): Text) -> String {
 //======================================
 // Impls
 //======================================
+
+impl TextSpan {
+    fn from_link(
+        link_type: LinkType,
+        text: Text,
+        destination: String,
+        label: String,
+    ) -> TextSpan {
+        if !label.is_empty() {
+            eprintln!("warning: link label is ignored: {label:?}");
+        }
+
+        match link_type {
+            LinkType::Inline => (),
+            _ => todo!("support non-inline link type: {link_type:?} (destination: {destination})"),
+        }
+
+        TextSpan::Link {
+            label: text,
+            destination,
+        }
+    }
+}
 
 impl Block {
     fn paragraph(text: Vec<TextSpan>) -> Block {
