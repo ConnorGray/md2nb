@@ -332,7 +332,7 @@ fn text_to_boxes(text: Text) -> Expr {
                 ],
             )),
             TextSpan::SoftBreak => row.push(Expr::string(" ")),
-            TextSpan::HardBreak => todo!("handle {span:?}"),
+            TextSpan::HardBreak => row.push(Expr::string("\n")),
         }
     }
 

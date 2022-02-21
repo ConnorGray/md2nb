@@ -48,6 +48,11 @@ This is some content in between.
 >
 > Empty lines within the block quote will render as empty lines in the notebook.
 
+Block quotes support hard breaks:
+
+> First line. \
+> Second line.
+
 #### Tables
 
 | Column A | Column B | Third Column |

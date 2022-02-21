@@ -347,10 +347,13 @@ fn unwrap_text(events: Vec<UnflattenedEvent>, mut styles: HashSet<TextStyle>) ->
                     styles.remove(&TextStyle::Strikethrough);
                 },
                 Tag::Paragraph => {
-                    // If this is a separate paragraph, insert a hardbreak. Don't insert
-                    // a hardbreak if there isn't any existing text content, to avoid
-                    // having a leading empty line.
+                    // If this is a separate paragraph, insert two hardbreaks
+                    // (two newlines). Don't insert hardbreaks if there isn't any existing
+                    // text content, to avoid having leading empty lines.
                     if !text_spans.is_empty() {
+                        // TODO: Replace this with a new TextSpan::ParagraphBreak?
+                        //       A HardBreak is just a newline.
+                        text_spans.push(TextSpan::HardBreak);
                         text_spans.push(TextSpan::HardBreak);
                     }
                     text_spans.extend(unwrap_text(events, styles.clone()))
@@ -406,7 +409,7 @@ fn text_to_string(Text(text_spans): Text) -> String {
                 string.push_str(" ");
             },
             TextSpan::HardBreak => {
-                string.push_str("\n\n");
+                string.push_str("\n");
             },
             _ => todo!("handle span: {span:?}"),
         }
