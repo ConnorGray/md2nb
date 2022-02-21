@@ -28,7 +28,8 @@ pub enum Block {
     List(Vec<ListItem>),
     Heading(HeadingLevel, Text),
     CodeBlock(Option<String>, String),
-    BlockQuote(Text),
+    /// *CommonMark Spec:* [block quotes](https://spec.commonmark.org/0.30/#block-quotes)
+    BlockQuote(Vec<Block>),
     Table {
         headers: Vec<Text>,
         rows: Vec<Vec<Text>>,
@@ -240,8 +241,8 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                         complete.push(Block::CodeBlock(fence_label, code_text))
                     },
                     Tag::BlockQuote => {
-                        let text = unwrap_text(events, Default::default());
-                        complete.push(Block::BlockQuote(text))
+                        let blocks = events_to_blocks(events);
+                        complete.push(Block::BlockQuote(blocks))
                     },
                     // TODO: Support table column alignments.
                     Tag::Table(_alignments) => {

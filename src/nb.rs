@@ -96,14 +96,22 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
                 },
             }
         },
-        Block::BlockQuote(quote) => {
+        Block::BlockQuote(quote_blocks) => {
+            let quote_cells: Vec<Expr> = quote_blocks
+                .into_iter()
+                .flat_map(|block| block_to_cells(block, opts))
+                .collect();
+
             // TODO: Use a dedicated "BlockQuote" cell style. There is no "BlockQuote"
             //       style in the default Wolfram notebook stylesheet, but we could add
             //       a StyleData definition to this notebook.
             let cell = Expr::normal(
                 Symbol::new("System`Cell"),
                 vec![
-                    text_to_text_data(quote),
+                    Expr::normal(
+                        Symbol::new("System`BoxData"),
+                        vec![Expr::list(quote_cells)],
+                    ),
                     Expr::string("Text"),
                     // Only the left side should have a frame:
                     //   CellFrame -> {{4, 0}, {0, 0}}

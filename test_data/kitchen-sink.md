@@ -63,6 +63,26 @@ Block quotes support styled text:
 
 > Block quote with *italicized **and** bolded* text, nested.
 
+##### Nested block quotes
+
+> Block quotes can be nested
+>
+> > This is useful for representing conversations in markdown.
+> >
+> > > The block quotes can be nested to an arbitrary depth.
+
+In addition to containing nested block quotes, block quotes can also contain code blocks:
+
+> Block quotes can be nested
+>
+> ```wolfram
+> Print["This is some quoted code!"]
+> ```
+>
+> ```python
+> print("This is some quoted code!")
+> ```
+
 #### Tables
 
 | Column A | Column B | Third Column |
