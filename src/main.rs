@@ -10,8 +10,9 @@ use wolfram_app_discovery::WolframApp;
 use wolfram_expr::{Expr, Symbol};
 use wstp::kernel::{self, WolframKernelProcess};
 
-/// Discovery local installations of the Wolfram Language and Wolfram products.
+/// Convert Markdown files into Wolfram Notebooks.
 #[derive(Parser, Debug)]
+#[clap(author, version)]
 struct Args {
     /// Markdown input file.
     input: PathBuf,
