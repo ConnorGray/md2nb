@@ -27,7 +27,17 @@ pub enum Block {
     Paragraph(Text),
     List(Vec<ListItem>),
     Heading(HeadingLevel, Text),
-    CodeBlock(Option<String>, String),
+    /// An indented or fenced code block.
+    ///
+    /// *CommonMark Spec:* [indented code blocks](https://spec.commonmark.org/0.30/#indented-code-blocks),
+    /// [fenced code blocks](https://spec.commonmark.org/0.30/#fenced-code-blocks)
+    CodeBlock {
+        /// If this `CodeBlock` is a fenced code block, this is its info string.
+        ///
+        /// *CommonMark Spec:* [info string](https://spec.commonmark.org/0.30/#info-string)
+        info_string: Option<String>,
+        code: String,
+    },
     /// *CommonMark Spec:* [block quotes](https://spec.commonmark.org/0.30/#block-quotes)
     BlockQuote(Vec<Block>),
     Table {
@@ -238,7 +248,10 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                         let text_spans = unwrap_text(events, Default::default());
                         let code_text = text_to_string(text_spans);
 
-                        complete.push(Block::CodeBlock(fence_label, code_text))
+                        complete.push(Block::CodeBlock {
+                            info_string: fence_label,
+                            code: code_text,
+                        })
                     },
                     Tag::BlockQuote => {
                         let blocks = events_to_blocks(events);

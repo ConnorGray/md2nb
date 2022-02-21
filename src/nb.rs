@@ -53,7 +53,10 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
 
             list_cells
         },
-        Block::CodeBlock(label, code_text) => {
+        Block::CodeBlock {
+            info_string: label,
+            code: code_text,
+        } => {
             let external_language: Option<&str> =
                 // The languages listed here should be all of those currently supported
                 // by ExternalEvaluate.
@@ -249,7 +252,7 @@ fn list_item_to_cells(state: &mut State, ListItem(blocks): ListItem) -> Vec<Expr
                 todo!("handle markdown block quote inside list items")
             },
             Block::Heading(_, _) => todo!("handle markdown headings inside list items"),
-            Block::CodeBlock(_, _) => {
+            Block::CodeBlock { .. } => {
                 todo!("handle markdown code block inside list item")
             },
             Block::Table { .. } => todo!("handle markdown table inside list item"),
