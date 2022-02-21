@@ -17,6 +17,12 @@ Links are [also supported](https://example.org).
 
 ## Feature Coverage
 
+#### Text
+
+Hard breaks are supported. \
+This is a separate line without a paragraph break.
+This is in the same paragraph, without a hard break.
+
 #### Code blocks
 
 ```rust
