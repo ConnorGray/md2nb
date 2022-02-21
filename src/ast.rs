@@ -333,14 +333,17 @@ fn unwrap_text(
                 Tag::Emphasis => {
                     styles.insert(TextStyle::Emphasis);
                     text_spans.extend(unwrap_text(events, styles.clone()));
+                    styles.remove(&TextStyle::Emphasis);
                 },
                 Tag::Strong => {
                     styles.insert(TextStyle::Strong);
                     text_spans.extend(unwrap_text(events, styles.clone()));
+                    styles.remove(&TextStyle::Strong);
                 },
                 Tag::Strikethrough => {
                     styles.insert(TextStyle::Strikethrough);
                     text_spans.extend(unwrap_text(events, styles.clone()));
+                    styles.remove(&TextStyle::Strikethrough);
                 },
                 Tag::Paragraph => {
                     // If this is a separate paragraph, insert a hardbreak. Don't insert
