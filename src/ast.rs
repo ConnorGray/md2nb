@@ -25,10 +25,10 @@ pub enum Block {
     List(Vec<ListItem>),
     Heading(HeadingLevel, Text),
     CodeBlock(Option<String>, String),
-    BlockQuote(String),
+    BlockQuote(Text),
     Table {
-        headers: Vec<String>,
-        rows: Vec<Vec<String>>,
+        headers: Vec<Text>,
+        rows: Vec<Vec<Text>>,
     },
     Rule,
 }
@@ -245,10 +245,8 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                         complete.push(Block::CodeBlock(fence_label, code_text))
                     },
                     Tag::BlockQuote => {
-                        let text_spans = unwrap_text(events, Default::default());
-                        let string = text_to_string(text_spans);
-
-                        complete.push(Block::BlockQuote(string))
+                        let text = unwrap_text(events, Default::default());
+                        complete.push(Block::BlockQuote(text))
                     },
                     // TODO: Support table column alignments.
                     Tag::Table(_alignments) => {
@@ -264,12 +262,12 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                         let mut headers = Vec::new();
 
                         for table_cell in header_events {
-                            let table_cell_spans = unwrap_text(
+                            let table_cell_text = unwrap_text(
                                 unwrap_table_cell(table_cell),
                                 HashSet::new(),
                             );
 
-                            headers.push(text_to_string(table_cell_spans));
+                            headers.push(table_cell_text);
                         }
 
                         let mut rows = Vec::new();
@@ -286,12 +284,12 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                             let mut row = Vec::new();
 
                             for table_cell in row_events {
-                                let table_cell_spans = unwrap_text(
+                                let table_cell_text = unwrap_text(
                                     unwrap_table_cell(table_cell),
                                     HashSet::new(),
                                 );
 
-                                row.push(text_to_string(table_cell_spans));
+                                row.push(table_cell_text);
                             }
 
                             rows.push(row);

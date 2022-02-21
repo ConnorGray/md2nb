@@ -53,10 +53,14 @@ Block quotes support hard breaks:
 > First line. \
 > Second line.
 
+Block quotes support styled text:
+
+> Block quote with *italicized **and** bolded* text, nested.
+
 #### Tables
 
 | Column A | Column B | Third Column |
 |----------|----------|--------------|
 | Foo      | Fizz     | ✅           |
 | Baz      | Buzz     | ❌           |
-| This is a row with some longer content, that might even word wrap. | Content in separate columns will word wrap separately. | ❔ |
+| This is a row with some longer content, that might even word wrap. | Content in separate columns will word wrap separately. Text in tables can *also be italicized* or **bolded**. | ❔ |

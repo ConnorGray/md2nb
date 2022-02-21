@@ -103,7 +103,7 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
             let cell = Expr::normal(
                 Symbol::new("System`Cell"),
                 vec![
-                    Expr::string(quote),
+                    text_to_text_data(quote),
                     Expr::string("Text"),
                     // Only the left side should have a frame:
                     //   CellFrame -> {{4, 0}, {0, 0}}
@@ -141,10 +141,10 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
 
             let header_row = headers
                 .into_iter()
-                .map(|content: String| {
+                .map(|content: Text| {
                     Expr::normal(
                         Symbol::new("System`Cell"),
-                        vec![Expr::string(content), Expr::from("Subsubsubsection")],
+                        vec![text_to_text_data(content), Expr::from("Subsubsubsection")],
                     )
                 })
                 .collect();
@@ -154,10 +154,10 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
             for row_content in rows {
                 let row: Vec<Expr> = row_content
                     .into_iter()
-                    .map(|content: String| {
+                    .map(|content: Text| {
                         Expr::normal(
                             Symbol::new("System`Cell"),
-                            vec![Expr::string(content), Expr::from("Text")],
+                            vec![text_to_text_data(content), Expr::from("Text")],
                         )
                     })
                     .collect();
