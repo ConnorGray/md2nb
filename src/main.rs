@@ -16,7 +16,7 @@ struct Args {
     /// Markdown input file.
     input: PathBuf,
 
-    /// Output file location. (default: <INPUT>.nb)
+    /// Output file location. (default: `<INPUT>.nb`)
     ///
     /// If this is a directory, the output notebook file will have the same file name
     /// as the input file.
