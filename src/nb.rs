@@ -212,7 +212,76 @@ fn block_to_cells_(state: &mut State, opts: &Options, block: Block) -> Vec<Expr>
                 ],
             )]
         },
-        Block::Rule => todo!("handle markdown Rule"),
+        Block::Rule => {
+            // Note: This formatting is based on the menu item:
+            //         Insert > Horizontal Line > Paste Thick Line Object
+            // TODO:
+            //     Support inserting lines of different thickness, and with different
+            //     left-side margins based on context.
+            //
+            //     For example, `***` is supported within block quotes. Improve how it
+            //     looks when used in that context.
+            vec![Expr::normal(
+                Symbol::new("System`Cell"),
+                vec![
+                    Expr::string(""),
+                    Expr::string("Text"),
+                    // Editable->False,
+                    Expr::rule(
+                        Symbol::new("System`Editable"),
+                        Expr::symbol(Symbol::new("System`False")),
+                    ),
+                    // Selectable->False,
+                    // CellFrame->{{0, 0}, {0, 3}},
+                    Expr::rule(
+                        Symbol::new("System`CellFrame"),
+                        Expr::list(vec![
+                            Expr::list(vec![Expr::from(0), Expr::from(0)]),
+                            Expr::list(vec![Expr::from(0), Expr::from(3)]),
+                        ]),
+                    ),
+                    // ShowCellBracket->False,
+                    Expr::rule(
+                        Symbol::new("System`ShowCellBracket"),
+                        Expr::symbol(Symbol::new("System`False")),
+                    ),
+                    // CellMargins->{{0, 0}, {1, 1}},
+                    Expr::rule(
+                        Symbol::new("System`CellMargins"),
+                        Expr::list(vec![
+                            Expr::list(vec![Expr::from(0), Expr::from(0)]),
+                            Expr::list(vec![Expr::from(1), Expr::from(1)]),
+                        ]),
+                    ),
+                    // CellElementSpacings->{"CellMinHeight"->1},
+                    Expr::rule(
+                        Symbol::new("System`CellElementSpacings"),
+                        Expr::list(vec![Expr::rule(
+                            Expr::from("CellMinHeight"),
+                            Expr::from(1),
+                        )]),
+                    ),
+                    // CellFrameMargins->0,
+                    Expr::rule(Symbol::new("System`CellFrameMargins"), Expr::from(0)),
+                    // CellFrameColor->GrayLevel[0.75],
+                    Expr::rule(
+                        Symbol::new("System`CellFrameColor"),
+                        Expr::normal(
+                            Symbol::new("System`GrayLevel"),
+                            vec![Expr::real(0.75)],
+                        ),
+                    ),
+                    // CellSize->{Inherited, 5}
+                    Expr::rule(
+                        Symbol::new("System`CellSize"),
+                        Expr::list(vec![
+                            Expr::from(Symbol::new("System`Inherited")),
+                            Expr::from(5),
+                        ]),
+                    ),
+                ],
+            )]
+        },
     }
 }
 

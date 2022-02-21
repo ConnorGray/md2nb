@@ -44,6 +44,7 @@ pub enum Block {
         headers: Vec<Text>,
         rows: Vec<Vec<Text>>,
     },
+    /// *CommonMark Spec: [thematic breaks](https://spec.commonmark.org/0.30/#thematic-breaks)
     Rule,
 }
 
@@ -117,7 +118,7 @@ fn is_inline(event: &UnflattenedEvent) -> bool {
             Event::HardBreak => true,
             // TODO: HTML could cause break to next block?
             Event::Html(_) => false,
-            Event::Rule => true,
+            Event::Rule => false,
             Event::TaskListMarker(_) => false,
             Event::FootnoteReference(_) => true,
         },

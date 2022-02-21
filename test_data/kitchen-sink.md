@@ -94,3 +94,11 @@ In addition to containing nested block quotes, block quotes can also contain cod
 | Foo      | Fizz     | ✅           |
 | Baz      | Buzz     | ❌           |
 | This is a row with some longer content, that might even word wrap. | Content in separate columns will word wrap separately. Text in tables can *also be italicized* or **bolded**. | ❔ |
+
+#### Horizontal rules
+
+Horizontal rules can be used to visually split the document:
+
+***
+
+This is after the rule.
