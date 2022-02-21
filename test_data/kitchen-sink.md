@@ -31,6 +31,10 @@ fn it_also_has_code_block() {
 }
 ```
 
+Indented code blocks are supported:
+
+    "This is an indented code block."
+
 ##### Conversion of languages supported by `"ExternalLanguage"` cells
 
 ```python
