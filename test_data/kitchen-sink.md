@@ -23,6 +23,19 @@ Hard breaks are supported. \
 This is a separate line without a paragraph break.
 This is in the same paragraph, without a hard break.
 
+#### Links
+
+This is an [inline](https://example.org) link.
+
+This is a [full reference][full reference] link.
+
+This is a [shortcut] reference link.
+
+This is an autolink: <https://example.org>.
+
+[full reference]: https://example.org
+[shortcut]: https://example.org
+
 #### Code blocks
 
 ```rust

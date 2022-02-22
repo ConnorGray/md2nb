@@ -247,7 +247,7 @@ fn events_to_blocks(events: Vec<UnflattenedEvent>) -> Vec<Block> {
                         };
 
                         let text_spans = unwrap_text(events, Default::default());
-                        let code_text = text_to_string(text_spans);
+                        let code_text = text_to_string(&text_spans);
 
                         complete.push(Block::CodeBlock {
                             info_string: fence_label,
@@ -393,7 +393,7 @@ fn unwrap_table_cell(event: UnflattenedEvent) -> Vec<UnflattenedEvent> {
     }
 }
 
-fn text_to_string(Text(text_spans): Text) -> String {
+fn text_to_string(Text(text_spans): &Text) -> String {
     let mut string = String::new();
 
     for span in text_spans {
@@ -435,7 +435,20 @@ impl TextSpan {
 
         match link_type {
             LinkType::Inline => (),
-            _ => todo!("support non-inline link type: {link_type:?} (destination: {destination})"),
+            LinkType::Reference => (),
+            LinkType::Shortcut => (),
+            LinkType::Collapsed => (),
+            LinkType::Autolink => (),
+            LinkType::Email => (),
+            // Unknown
+            LinkType::ReferenceUnknown
+            | LinkType::CollapsedUnknown
+            | LinkType::ShortcutUnknown => {
+                eprintln!(
+                    "warning: unable to resolve location of link with text '{}'",
+                    text_to_string(&text)
+                )
+            },
         }
 
         TextSpan::Link {
