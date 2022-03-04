@@ -60,7 +60,16 @@ currently supported by `md2nb`.
 
 ## Installation
 
-*TODO*
+### Using cargo
+
+`md2nb` can be installed using `cargo`
+(the [Rust package manager](https://doc.rust-lang.org/cargo/)) by executing:
+
+```shell
+$ cargo install md2nb
+```
+
+This will install the latest version of [`md2nb` from crates.io](https://crates.io/crates/md2nb).
 
 ## License
 
