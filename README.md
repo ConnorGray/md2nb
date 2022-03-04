@@ -1,5 +1,8 @@
 # md2nb
 
+[![Crates.io](https://img.shields.io/crates/v/md2nb.svg)](https://crates.io/crates/md2nb)
+![License](https://img.shields.io/crates/l/md2nb.svg)
+
 `md2nb` is a command-line tool for converting [Markdown](https://wikipedia.org/wiki/Markdown)
 files into [Wolfram Notebooks](https://wolfram.com/notebooks).
 
